@@ -17,6 +17,9 @@ func CountClaims(claims []Rect, x, y int) int {
 	for _, r := range claims {
 		if x >= r.x && x < r.x+r.width && y >= r.y && y < r.y+r.height {
 			c++
+			if c > 1 {
+				return c
+			}
 		}
 	}
 	return c

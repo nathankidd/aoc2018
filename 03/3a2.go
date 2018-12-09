@@ -37,7 +37,11 @@ func main() {
 		}
 		claims = append(claims, r)
 	}
-	var f [1000][1000]byte
+
+	var f = make([][]byte, fab.width)
+	for i := range f {
+		f[i] = make([]byte, fab.height)
+	}
 
 	for _, r := range claims {
 		for y := 0; y < r.height; y++ {
@@ -50,8 +54,7 @@ func main() {
 	for _, r := range claims {
 		for y := 0; y < r.height; y++ {
 			for x := 0; x < r.width; x++ {
-				v := f[r.x+x][r.y+y]
-				if v > 1 {
+				if f[r.x+x][r.y+y] > 1 {
 					overlaps++
 					f[r.x+x][r.y+y] = 0 // don't count again
 				}

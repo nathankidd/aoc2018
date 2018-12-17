@@ -2,13 +2,14 @@ package main
 
 import (
 	"bufio"
-	"errors"
 	"fmt"
 	"os"
 	"sort"
 )
 
 const NumWorkers = 5
+const PerStepDelaySec = 60
+const Log = false
 
 type Step struct {
 	name     byte
@@ -58,7 +59,8 @@ func NewStepper(filename string) *Stepper {
 
 }
 
-func (s *Stepper) GetNextStep() (byte, error) {
+// Returns non-null if something available
+func (s *Stepper) GetNextStep() byte {
 	// Iterate through current list till reaching end
 list:
 	for i, c := range s.list {
@@ -74,9 +76,9 @@ list:
 		} else {
 			s.list = append(s.list[:i], s.list[i+1:]...)
 		}
-		return c, nil
+		return c
 	}
-	return 0, errors.New("No step available")
+	return 0
 }
 
 func In(c byte, list []byte) bool {
@@ -109,37 +111,58 @@ func (s *Stepper) Process() {
 		}
 	}
 
-	// Find starting step, which has no dependencies
+	// Find starting step(s), which have no dependencies
 	for k, v := range s.input {
 		if len(v.deps) == 0 {
 			s.list = append(s.list, k)
 		}
 	}
-
 	s.workers = make([]Worker, NumWorkers)
-	s.sec = 0
-	for len(s.list) > 0 {
+
+	if Log {
+		fmt.Printf("Second W1 W2 W3 W4 W5  Completed\n")
+	}
+	for s.sec = 0; ; s.sec++ {
 		sort.Slice(s.list, func(i, j int) bool { return s.list[i] < s.list[j] })
-		for _, w := range s.workers {
-			if w.cur == 0 {
-				var err error
-				w.cur, err = s.GetNextStep()
-				if err == nil {
-					w.donesec = s.sec + int(w.cur-'A') + 61
-				}
-			}
-			if w.donesec == s.sec {
+		// Reap completed, adding children to available list
+		for i := 0; i < len(s.workers); i++ {
+			w := &s.workers[i]
+			if w.cur != 0 && w.donesec == s.sec {
 				s.Complete(w.cur)
 				w.cur = 0
 			}
 		}
-		s.sec++
+		sort.Slice(s.list, func(i, j int) bool { return s.list[i] < s.list[j] })
+
+		// Start work if available steps/workers
+		for i := 0; i < len(s.workers); i++ {
+			w := &s.workers[i]
+			if w.cur == 0 {
+				w.cur = s.GetNextStep()
+				if w.cur != 0 {
+					w.donesec = s.sec + int(w.cur-'A') + 1 + PerStepDelaySec
+				}
+			}
+		}
+		if Log {
+			wstat := make([]byte, len(s.workers))
+			for i, w := range s.workers {
+				if w.cur == 0 {
+					wstat[i] = '.'
+				} else {
+					wstat[i] = w.cur
+				}
+			}
+			fmt.Printf(" %3d\t%c  %c  %c  %c  %c  %s\n", s.sec, wstat[0], wstat[1], wstat[2], wstat[3], wstat[4], s.answer)
+		}
+		if len(s.answer) == len(s.input) {
+			break
+		}
 	}
 }
 
 func main() {
-	s := NewStepper("input2")
+	s := NewStepper("input")
 	s.Process()
-	fmt.Println(s.answer)
 	fmt.Println(s.sec)
 }
